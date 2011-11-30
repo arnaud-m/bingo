@@ -1,0 +1,22 @@
+ BINGO : Batching INstante GeneratOr
+ ------------------------------------------
+
+ BINGO is an octave script for generating benchmark instances of batch processing problems with non-identical job sizes and equal release dates.
+
+ REQUIREMENTS
+ ------------
+
+ > GNU Octave, version 3.4.3 or later
+
+  DOCUMENTATION
+ -------------
+
+ Look for the most up-to-date documentation on the BINGO web site, under the Documentation menu
+ 
+
+ RELEASE
+ -------
+
+ The bingo-${project.version}.zip file is composed of the following directories and files:
+ TODO
+

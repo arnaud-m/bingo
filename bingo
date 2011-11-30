@@ -1,0 +1,397 @@
+#!/usr/bin/octave -qf
+###################################################
+##
+##Copyright (C) 2011 Arnaud Malapert.
+##
+## This program is a free software: you can redistribute it and/or modify	                   
+##  it under the terms of the GNU General Public License as published by                 
+## the Free Software Foundation, either version 3 of the License, or                          
+## (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.");
+##
+###################################################
+
+
+1; #not a function file
+
+####################################################
+#################### Utilities ##########################
+####################################################
+
+ global VERSION="0.1"
+
+ function _version()
+   global VERSION;
+   printf("%s %s\n", program_name(), VERSION);
+   disp("Copyright (C) 2011 Arnaud Malapert.");
+   disp("This program is free software: you can redistribute it and/or modify it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or \n(at your option) any later version.");
+ endfunction
+
+function _help()
+  printf("%s TODO", program_name());
+   
+  printf("\n\tUsage: %s [OPTION]... CONF N CAPA\n", program_name());
+  disp("Options:")
+  disp("\t--help        display this help and exit")
+  disp("\t--version     output version information and exit");
+          
+  disp("\n\nReport bugs to <malapert (at) i3s (dot) unice (dot) com>.")
+ endfunction
+
+
+################ random generation ####################
+function V=randi(n, min, max)
+  V=floor(rand(n,1).*(max - min +1)) .+ min;
+endfunction
+
+function V=randb(nb , n , p)
+  V= 1 + binornd(n-1, p, nb, 1);
+endfunction
+
+function V=rand_switch(nb, Dist) 
+  switch(Dist(1)) 
+    case 0
+      ##TODO change when upgrading octave version : randi
+      V=randi(nb, Dist(2), Dist(3));
+    case 1 
+      V=randb(nb, Dist(2), Dist(3)); 
+    case 2 
+      nbT = randi(1,0, nb);
+      V = [];
+      if( nbT > 0)
+	V=randb(nbT, Dist(2), Dist(3)); 
+      endif
+      nbT = nb - nbT;
+      if( nbT > 0)
+	V= [ V ; randb(nbT, Dist(4), Dist(5))]; 
+      endif
+      #random permutation of the vector.
+      V = V(randperm(nb));
+    otherwise 
+      error(cstrcat("Unknown distribution type for random generation : ", int2str(Dist(1))));
+  endswitch 
+endfunction
+
+
+function M=makePSW(nb, P, S, W) 
+  M= [ rand_switch(nb, P) rand_switch(nb, S) rand_switch(nb, W) ];
+endfunction
+
+function checkPSW(M, capa)
+  if (all( all(M(: , [ 1 2 3]) == 0))) 
+    error "Some durations, sizes or weights are negative or nil."
+  endif
+  if (any(M(: , 2) > capa)) 
+    error "Some sizes are greater than the bin capacity"
+  endif
+endfunction
+
+function makespan=estimateMakespan(M, idx, capa)
+if (idx < 1 || idx > size(M,1)) 
+error("Invalid job index");
+endif
+#add dummy jobs to ensure that sum s_j is a multiple of the capacity
+csize = capa - mod( sum(M([1:idx],2)), capa);
+#sort the matrix according to shortest processing times
+[S, I] = sort (M ([1:idx], 1));
+S = M (I, :);
+# start to build batches
+makespan=0;
+for i=1:idx
+  nsize = csize + S(i, 2);
+  if(nsize >= capa)
+    csize =nsize-capa;
+    makespan+= S(i,1);
+  else
+    csize=nsize;
+  endif 
+endfor
+if(csize > 0)
+error("Estimation of makespan\t[FAIL]");
+endif
+endfunction
+
+##FIXME computations of due dates are incorrect
+function D=makeDC(M, capa, t, r) 
+  nb=size(M,1);
+  Pn = estimateMakespan(M, nb, capa);
+  D= randi(nb , floor( Pn * (1 - t - 0.5* r)), ceil(Pn * (1 - t  + 0.5* r)));
+endfunction
+
+function D=makeDM(M, capa, t, r) 
+   for j = 1:size(M,1) 
+    Pj =  estimateMakespan(M, j, capa);
+    D(j) =randi(1,floor( Pj * (1 - t*r)), ceil(Pj* (1+ (1-t)*r)));
+  endfor
+  D=D';
+endfunction
+
+
+
+#################### PDF ########################
+function check_pdf(V)
+  s = sum(V);
+  if( s < 0.99999 || s>1.00001) 
+    format long E
+    sum(V)
+    error("pdf calculation\t[FAIL]");
+    endif
+endfunction
+
+function V=pdfi(gmax, min, max)
+  l=max - min + 1;
+  V=[zeros(min,1) ; ones(l,1)/l ; zeros(gmax- max, 1) ];
+  check_pdf(V);
+endfunction
+
+function V=pdfb(gmax, n , p)
+  V= [0 ; binopdf([0:(n-1)]', n-1, p) ;zeros( gmax - n, 1)  ];
+  check_pdf(V);
+endfunction
+
+function V=pdf_switch(max, Dist) 
+  switch(Dist(1)) 
+    case 0
+      V=pdfi(max, Dist(2), Dist(3));
+    case 1 
+      V=pdfb(max, Dist(2), Dist(3)); 
+    case 2 
+      V= (pdfb(max, Dist(2), Dist(3)) .+ pdfb(max, Dist(4), Dist(5)))/2;
+    otherwise 
+      error(cstrcat("Unknown distribution type for pdf calculation : ", int2str(Dist(1))));
+  endswitch 
+endfunction
+
+
+function PDF=computePDF(M)
+  gmax = max (max(M));
+  PDF = [0:gmax]';
+  for i = 1:rows(M);
+    PDF = [ PDF pdf_switch(gmax, M(i, :))];
+  endfor
+endfunction
+
+
+
+#################### String ########################
+function str=b2str(mean, var) 
+  str=strcat("B(", int2str(mean),",",int2str(var),")"); 
+endfunction
+
+function str=d2str(prefix, Dist)
+   switch (Dist(1)) 
+    case 0 
+      str=strcat(prefix , "=U[", int2str(Dist(2)),",",int2str(Dist(3)),"]\t"); 
+    case 1 
+      str=strcat(prefix, "=", b2str(Dist(2), Dist(3)), "\t");
+    case 2 
+      str=strcat(prefix, "=B2{", b2str(Dist(2), Dist(3)),",",b2str(Dist(4), Dist(5)),"}\t"); 
+    otherwise 
+      error(cstrcat("Unknown distribution type for random generation : ", int2str(Dist(1))));
+  endswitch 
+endfunction
+
+function str=dd2str(mode, t, r)
+  switch(mode)
+    case "DC"
+      str="#D=U[Pn(1 - t - R/2), Pn(1 - t + R/2)";
+    case "DM"
+      str="#D=U[Pj(1 - t x R), Pj(1 + (1 - t) x R)]";
+    otherwise
+      error(cstrcat("Unknown due date distribution type for random generation : ", mode));
+  endswitch;
+      str=strcat(str, " (t=", num2str(t),", r=",num2str(r),")"); 
+endfunction
+
+
+#################### Plotting ########################
+
+#some color definitions
+blue_025=[0.447 0.592 0.902];
+green_025=[0.404 0.922 0.518];
+red_025=[0.976  0.478 0.427];
+brown_025 = [ 0.97647 0.7882 0.4274];
+blue_075 = [0.1843 0.24706   0.37647];
+global my_colors={ blue_025, green_025, red_025, brown_025, blue_075};
+global my_types={"durations", "sizes", "weights"};
+
+
+function plotDispersion (prefix, idx , M)
+  global my_colors;
+  global my_types;
+  h = bar(accumarray(M(:,idx),1)) ;
+  set (h, "facecolor", my_colors{idx}); 
+  set (h, "edgecolor", "black"); 
+  xlabel("Value");
+  ylabel("#Occurences");
+  title(cstrcat("Distribution of ", my_types{idx}));
+  print(strcat(prefix, "-", my_types{idx}, ".svg"), "-dsvg")
+endfunction
+
+function plotSTAT(idx , M)
+  global my_colors;
+  global my_types;
+  h=errorbar(M(:,idx), M(:, idx + 3));
+  title(strcat("Means and standard deviations (",  my_types{idx},")"));
+  xlabel("Instance");
+  ylabel("Value");
+  axis([0, rows(M), min(M(:,idx) - M(:, idx + 3)) , max(M(:,idx) + M(:, idx + 3))]);
+  set (h, "color",my_colors{idx}); 
+  set (h, "linewidth", 2); 
+  print(strcat("summary-", my_types{idx}, ".svg"), "-dsvg")
+endfunction
+
+function plotPDF (idx , M)
+  close all
+  global my_colors;
+  global my_types;
+  R=[ 2:columns(M)];
+  ymax =ceil( max(max(M(:,R)))*10)/10;
+  h=plot(M(:, 1), M(:, R)); 
+  axis([0,M(rows(M),1), 0, ymax]);
+  title(cstrcat("Probability Density Functions of ",  my_types{idx}));
+  ylabel("Probability Density");
+  xlabel("Value");
+  set (h, "linewidth", 3); 
+  #set (h, "markersize", 10); 
+  cpt = 0;
+  for i = 1:rows(h)
+    for j = 1:columns(h)
+      nbc = length(my_colors);
+      color=my_colors{mod(cpt, nbc)+1};
+      set(h(i,j), "color", color); 
+      # set(h(i,j), "markerfacecolor", color);
+      # set(h(i,j), "markeredgecolor", color);
+      # switch (idivide(cpt, nbc, "floor"))
+      # case 0 
+      # 	  set (h(i,j), "marker", "o"); 
+      # case 1 
+      # 	  set (h(i,j), "marker", "*");
+      # otherwise 
+      # 	  set (h(i,j), "marker", "x");  
+      # endswitch
+      cpt++;
+    endfor
+  endfor
+  print(strcat("pdf-", my_types{idx}, ".svg"), "-dsvg")
+#pause
+endfunction
+
+
+
+
+function plotPSW (prefix, M)
+ plotDispersion(prefix, 1, M);
+ plotDispersion(prefix, 2, M);
+ plotDispersion(prefix, 3, M);
+endfunction
+
+function plotSTATS (M)
+plotSTAT(1, M);
+plotSTAT(2, M);
+plotSTAT(3, M);
+endfunction
+
+#################### Export ########################
+function save_inst(header, n, capa, PSW, STATS)
+  filename = strcat(header{1}, ".txt");
+  fid = fopen (filename, "w");
+  fprintf(fid, "#%s : created by A. Malapert using octave %s (%s).\n", header{1},   version, strftime("%A, %B %d %Y", localtime (time ())))
+  fprintf(fid, "#%s\n#%s\n#%s\n#%s\n",  header{2}, header{3}, header{4}, header{5})
+  fprintf(fid, "%i\n%i\n",  n, capa)
+  fprintf (fid, "%3i %3i %3i %4i\n", PSW');
+  r = rows(STATS);
+  fprintf (fid, "#Mean\n#%3i %3i %3i  --\n#Standard deviation\n#%3i %3i %3i --", STATS(r,:));
+  fclose (fid);
+  printf("Generation of %s\t[OK]\n",header{1});
+endfunction
+
+
+####################################################
+#################### SCRIPT ##########################
+####################################################
+
+args = argv ();
+if( nargin > 0)
+  if(strcmp(args{1},"--version"))
+    _version();
+    exit(0);
+  elseif(strcmp(args{1},"--help"))
+    _help();
+    exit(0);
+  endif
+endif
+
+setenv("GNUTERM", "wxt")
+load(args{1});
+################### Compute PDFs #######################
+PDF_P=computePDF(P);
+plotPDF(1, PDF_P)
+PDF_S=computePDF(S);
+plotPDF(2, PDF_S)
+PDF_W=computePDF(W);
+plotPDF(3, PDF_W)
+#save("summary-pdf.dat", PDF_P, PDF_S, PDF_W)
+############ Loop over number of jobs, durations, sizes and weights ##########
+nb=str2num(args{2});
+if(nb > 0)
+  capa=str2num(args{3});
+  header = cell(1,5);
+  STATS=[];
+  for n = 1:length(N)
+    for p = 1:rows(P)
+      header{2} = d2str("P", P(p,:)) ;
+      for s = 1:rows(S)
+	header{3} = d2str("S", S(s,:)) ;
+	for w = 1:size(W)
+	  header{4} = d2str("W", W(w,:));
+	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
+	  dd=1; 
+	  dd2 = length(D)*length(D);
+	  if(2*dd2 > 10) 
+	    dd_format = "%0.2i";
+	  else
+	    dd_format = "%i";
+	  endif
+	  for t = D
+      	    for r = D
+	      for i = 1:nb
+		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
+		STATS=[ STATS; mean(DATA) std(DATA)];
+		checkPSW(DATA, capa);
+		plotPSW(strcat(prefix, "_", int2str(i)), DATA)
+		################## Managerial Due Dates ########################
+		header{5}=dd2str("DM", t, r);
+		header{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
+		DATA=[ DATA makeDM(DATA, capa,t,r)];
+		save_inst(header, N(n), capa, DATA, STATS);
+		################## Classical Due Dates ########################
+		header{5}=dd2str("DC", t, r);
+		header{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
+		DATA=[ DATA makeDC(DATA, capa,t,r)];
+		save_inst(header, N(n), capa, DATA, STATS);
+		######################################################
+	      endfor
+	      dd++;  
+	    endfor
+	  endfor
+	endfor
+      endfor
+    endfor
+  endfor
+  STATS= round(STATS*100)/100;
+  plotSTATS(STATS);
+  save "summary.dat" STATS
+else 
+  warning "No benchmark generation." 
+endif
+
+
+
