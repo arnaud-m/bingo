@@ -42,7 +42,7 @@ function _help()
   disp("\t--help        display this help and exit")
   disp("\t--version     output version information and exit");
           
-  disp("\n\nReport bugs to <malapert (at) i3s (dot) unice (dot) com>.")
+  disp("\n\nReport bugs to <arnaud (dot) malapert (at) unice (dot) fr>.")
  endfunction
 
 
@@ -181,19 +181,16 @@ endfunction
 
 
 #################### String ########################
-function str=b2str(mean, var) 
-  str=strcat("B(", int2str(mean),",",int2str(var),")"); 
-endfunction
 
 function str=d2str(prefix, Dist)
    switch (Dist(1)) 
-    case 0 
-      str=strcat(prefix , "=U[", int2str(Dist(2)),",",int2str(Dist(3)),"]\t"); 
-    case 1 
-      str=strcat(prefix, "=", b2str(Dist(2), Dist(3)), "\t");
-    case 2 
-      str=strcat(prefix, "=B2{", b2str(Dist(2), Dist(3)),",",b2str(Dist(4), Dist(5)),"}\t"); 
-    otherwise 
+     case 0
+       str=sprintf( "%s = U[%i,%i]" ,prefix, Dist(2:3));
+     case 1 
+       str=sprintf( "%s = B(%i,%g)" ,prefix, Dist(2:3)); 
+     case 2
+       str=sprintf( "%s = {B(%i,%g), B(%i,%g)}" ,prefix, Dist(2:5)); 
+     otherwise 
       error(cstrcat("Unknown distribution type for random generation : ", int2str(Dist(1))));
   endswitch 
 endfunction
@@ -201,13 +198,12 @@ endfunction
 function str=dd2str(mode, t, r)
   switch(mode)
     case "DC"
-      str="#D=U[Pn(1 - t - R/2), Pn(1 - t + R/2)";
+      str=sprintf("D(%g,%g) = U[Pn(1 - t - R/2), Pn(1 - t + R/2)", t, r);
     case "DM"
-      str="#D=U[Pj(1 - t x R), Pj(1 + (1 - t) x R)]";
+      str=sprintf("D(%g,%g) = U[Pj(1 - t x R), Pj(1 + (1 - t) x R)]", t, r);
     otherwise
       error(cstrcat("Unknown due date distribution type for random generation : ", mode));
   endswitch;
-      str=strcat(str, " (t=", num2str(t),", r=",num2str(r),")"); 
 endfunction
 
 
@@ -300,17 +296,18 @@ plotSTAT(3, M);
 endfunction
 
 #################### Export ########################
-function save_inst(header, n, capa, PSW, STATS)
-  filename = strcat(header{1}, ".txt");
+function save_inst(info, n, capa, DATA, STATS)
+  global VERSION;
+  filename = strcat(info{1}, ".txt");
   fid = fopen (filename, "w");
-  fprintf(fid, "#%s : created by A. Malapert using octave %s (%s).\n", header{1},   version, strftime("%A, %B %d %Y", localtime (time ())))
-  fprintf(fid, "#%s\n#%s\n#%s\n#%s\n",  header{2}, header{3}, header{4}, header{5})
+  fprintf(fid, "# %s created on %s by %s %s (octave %s).\n", info{1}, date, program_name(), VERSION, version);
+  fprintf(fid, "# %s\n# %s\n# %s\n# %s\n",  info{2}, info{3}, info{4}, info{5})
   fprintf(fid, "%i\n%i\n",  n, capa)
-  fprintf (fid, "%3i %3i %3i %4i\n", PSW');
+  fprintf (fid, "%3i %3i %3i %4i\n", DATA');
   r = rows(STATS);
-  fprintf (fid, "#Mean\n#%3i %3i %3i  --\n#Standard deviation\n#%3i %3i %3i --", STATS(r,:));
+  fprintf (fid, "# Averages\n#%3i %3i %3i  %4i\n# Standard deviations\n#%3i %3i %3i %4i", STATS(r,1:3), mean(DATA(:,4)), STATS(r,4:6), std(DATA(:,4)));
   fclose (fid);
-  printf("Generation of %s\t[OK]\n",header{1});
+  printf("Generation of %s\t[OK]\n",info{1});
 endfunction
 
 
@@ -343,15 +340,15 @@ plotPDF(3, PDF_W)
 nb=str2num(args{2});
 if(nb > 0)
   capa=str2num(args{3});
-  header = cell(1,5);
+  info = cell(1,5);
   STATS=[];
   for n = 1:length(N)
     for p = 1:rows(P)
-      header{2} = d2str("P", P(p,:)) ;
+      info{2} = d2str("P", P(p,:)) ;
       for s = 1:rows(S)
-	header{3} = d2str("S", S(s,:)) ;
+	info{3} = d2str("S", S(s,:)) ;
 	for w = 1:size(W)
-	  header{4} = d2str("W", W(w,:));
+	  info{4} = d2str("W", W(w,:));
 	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
 	  dd=1; 
 	  dd2 = length(D)*length(D);
@@ -368,15 +365,15 @@ if(nb > 0)
 		checkPSW(DATA, capa);
 		plotPSW(strcat(prefix, "_", int2str(i)), DATA)
 		################## Managerial Due Dates ########################
-		header{5}=dd2str("DM", t, r);
-		header{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
+		info{5}=dd2str("DM", t, r);
+		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
 		DATA=[ DATA makeDM(DATA, capa,t,r)];
-		save_inst(header, N(n), capa, DATA, STATS);
+		save_inst(info, N(n), capa, DATA, STATS);
 		################## Classical Due Dates ########################
-		header{5}=dd2str("DC", t, r);
-		header{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
+		info{5}=dd2str("DC", t, r);
+		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
 		DATA=[ DATA makeDC(DATA, capa,t,r)];
-		save_inst(header, N(n), capa, DATA, STATS);
+		save_inst(info, N(n), capa, DATA, STATS);
 		######################################################
 	      endfor
 	      dd++;  
@@ -388,7 +385,6 @@ if(nb > 0)
   endfor
   STATS= round(STATS*100)/100;
   plotSTATS(STATS);
-  save "summary.dat" STATS
 else 
   warning "No benchmark generation." 
 endif
