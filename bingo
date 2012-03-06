@@ -35,10 +35,12 @@
  endfunction
 
 function _help()
-  printf("%s TODO", program_name());
+  printf("%s generates benchmark instances for batch processing problems.", program_name());
    
   printf("\n\tUsage: %s [OPTION]... CONF N CAPA\n", program_name());
+  disp("")
   disp("Options:")
+  disp("\t--graph      draw graphics for each generated instance\n")
   disp("\t--help        display this help and exit")
   disp("\t--version     output version information and exit");
           
@@ -47,9 +49,6 @@ function _help()
 
 
 ################ random generation ####################
-function V=randi(n, min, max)
-  V=floor(rand(n,1).*(max - min +1)) .+ min;
-endfunction
 
 function V=randb(nb , n , p)
   V= 1 + binornd(n-1, p, nb, 1);
@@ -58,12 +57,11 @@ endfunction
 function V=rand_switch(nb, Dist) 
   switch(Dist(1)) 
     case 0
-      ##TODO change when upgrading octave version : randi
-      V=randi(nb, Dist(2), Dist(3));
+      V=randi(Dist(2:3), nb,1);
     case 1 
       V=randb(nb, Dist(2), Dist(3)); 
     case 2 
-      nbT = randi(1,0, nb);
+      nbT = randi(nb);
       V = [];
       if( nbT > 0)
 	V=randb(nbT, Dist(2), Dist(3)); 
@@ -122,13 +120,13 @@ endfunction
 function D=makeDC(M, capa, t, r) 
   nb=size(M,1);
   Pn = estimateMakespan(M, nb, capa);
-  D= randi(nb , floor( Pn * (1 - t - 0.5* r)), ceil(Pn * (1 - t  + 0.5* r)));
+  D= randi([ floor( Pn * (1 - t - 0.5* r)), ceil(Pn * (1 - t  + 0.5* r))], nb,1);
 endfunction
 
 function D=makeDM(M, capa, t, r) 
    for j = 1:size(M,1) 
     Pj =  estimateMakespan(M, j, capa);
-    D(j) =randi(1,floor( Pj * (1 - t*r)), ceil(Pj* (1+ (1-t)*r)));
+    D(j) =randi([ floor( Pj * (1 - t*r)), ceil(Pj* (1+ (1-t)*r))]);
   endfor
   D=D';
 endfunction
@@ -250,7 +248,7 @@ function plotPDF (idx , M)
   global my_types;
   R=[ 2:columns(M)];
   ymax =ceil( max(max(M(:,R)))*10)/10;
-  h=plot(M(:, 1), M(:, R)); 
+  h=plot(M(:, 1), M(:, R));
   axis([0,M(rows(M),1), 0, ymax]);
   title(cstrcat("Probability Density Functions of ",  my_types{idx}));
   ylabel("Probability Density");
@@ -263,16 +261,6 @@ function plotPDF (idx , M)
       nbc = length(my_colors);
       color=my_colors{mod(cpt, nbc)+1};
       set(h(i,j), "color", color); 
-      # set(h(i,j), "markerfacecolor", color);
-      # set(h(i,j), "markeredgecolor", color);
-      # switch (idivide(cpt, nbc, "floor"))
-      # case 0 
-      # 	  set (h(i,j), "marker", "o"); 
-      # case 1 
-      # 	  set (h(i,j), "marker", "*");
-      # otherwise 
-      # 	  set (h(i,j), "marker", "x");  
-      # endswitch
       cpt++;
     endfor
   endfor
@@ -280,6 +268,40 @@ function plotPDF (idx , M)
 #pause
 endfunction
 
+function plotPDF_All (P, S, W)
+  close all
+  global my_colors;
+  title("Probability Density Functions");
+  ylabel("Probability Density");
+  xlabel("Value");
+  RP=[ 2:columns(P)];
+  RS=[ 2:columns(S)];
+  RW=[ 2:columns(W)];
+%  ymax =ceil( max ( [ max(P(:,RP)) max(S(:,RS)) max(W(:,RW)) ])*10)/10;
+  h=plot(P(:, 1), P(:, RP), ";durations;", S(:, 1), S(:, RS), ";sizes;", W(:, 1), W(:, RW), ";weights;");
+#   h=plot(P(:, 1), P(:, RP), S(:, 1), S(:, RS), W(:, 1), W(:, RW));
+ set (h, "linewidth", 2); 
+  cpt = 1;
+  for i = 1:rows(h)
+    for j = 1:columns(h)
+      ##Legend
+      if(cpt != 1 && cpt != length(RP) + 1  && cpt != length(RP) + length(RS) + 1 )
+	set(h(i,j), "displayname", "");
+      endif
+      ##Colours 
+       if(cpt <= length(RP))
+	 set(h(i,j), "color", my_colors{1});
+       elseif(cpt <= length(RP) + length(RS))
+	 set(h(i,j), "color", my_colors{2});
+       else
+	 set(h(i,j), "color", my_colors{3}); 
+       endif	
+       cpt++;
+     endfor
+   endfor
+  # print(strcat("pdf-", my_types{idx}, ".svg"), "-dsvg")
+pause
+endfunction
 
 
 
@@ -314,8 +336,11 @@ endfunction
 ####################################################
 #################### SCRIPT ##########################
 ####################################################
+setenv("GNUTERM", "wxt")
 
 args = argv ();
+argidx=1;
+graph=0;
 if( nargin > 0)
   if(strcmp(args{1},"--version"))
     _version();
@@ -323,71 +348,82 @@ if( nargin > 0)
   elseif(strcmp(args{1},"--help"))
     _help();
     exit(0);
+  elseif(strcmp(args{1},"--graph"))
+    argidx=2;
+    graph=1;
   endif
+else
+  _help();
+  exit(1);
 endif
 
-setenv("GNUTERM", "wxt")
-load(args{1});
+
 ################### Compute PDFs #######################
+load(args{argidx++});
+
 PDF_P=computePDF(P);
-plotPDF(1, PDF_P)
+#plotPDF(1, PDF_P)
 PDF_S=computePDF(S);
-plotPDF(2, PDF_S)
+#plotPDF(2, PDF_S)
 PDF_W=computePDF(W);
-plotPDF(3, PDF_W)
-#save("summary-pdf.dat", PDF_P, PDF_S, PDF_W)
-############ Loop over number of jobs, durations, sizes and weights ##########
-nb=str2num(args{2});
-if(nb > 0)
-  capa=str2num(args{3});
-  info = cell(1,5);
-  STATS=[];
-  for n = 1:length(N)
-    for p = 1:rows(P)
-      info{2} = d2str("P", P(p,:)) ;
-      for s = 1:rows(S)
-	info{3} = d2str("S", S(s,:)) ;
-	for w = 1:size(W)
-	  info{4} = d2str("W", W(w,:));
-	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
-	  dd=1; 
-	  dd2 = length(D)*length(D);
-	  if(2*dd2 > 10) 
-	    dd_format = "%0.2i";
-	  else
-	    dd_format = "%i";
-	  endif
-	  for t = D
-      	    for r = D
-	      for i = 1:nb
-		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
-		STATS=[ STATS; mean(DATA) std(DATA)];
-		checkPSW(DATA, capa);
-		plotPSW(strcat(prefix, "_", int2str(i)), DATA)
-		################## Managerial Due Dates ########################
-		info{5}=dd2str("DM", t, r);
-		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
-		DATA=[ DATA makeDM(DATA, capa,t,r)];
-		save_inst(info, N(n), capa, DATA, STATS);
-		################## Classical Due Dates ########################
-		info{5}=dd2str("DC", t, r);
-		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
-		DATA=[ DATA makeDC(DATA, capa,t,r)];
-		save_inst(info, N(n), capa, DATA, STATS);
-		######################################################
-	      endfor
-	      dd++;  
-	    endfor
-	  endfor
-	endfor
-      endfor
-    endfor
-  endfor
-  STATS= round(STATS*100)/100;
-  plotSTATS(STATS);
-else 
-  warning "No benchmark generation." 
-endif
+#plotPDF(3, PDF_W)
+
+plotPDF_All(PDF_P, PDF_S, PDF_W)
+
+# ############ Loop over number of jobs, durations, sizes and weights ##########
+# nb=str2num(args{argidx++});
+# if(nb > 0)
+# capa=str2num(args{argidx++});
+#   info = cell(1,5);
+#   STATS=[];
+#   for n = 1:length(N)
+#     for p = 1:rows(P)
+#       info{2} = d2str("P", P(p,:)) ;
+#       for s = 1:rows(S)
+# 	info{3} = d2str("S", S(s,:)) ;
+# 	for w = 1:size(W)
+# 	  info{4} = d2str("W", W(w,:));
+# 	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
+# 	  dd=1; 
+# 	  dd2 = length(D)*length(D);
+# 	  if(2*dd2 > 10) 
+# 	    dd_format = "%0.2i";
+# 	  else
+# 	    dd_format = "%i";
+# 	  endif
+# 	  for t = D
+#       	    for r = D
+# 	      for i = 1:nb
+# 		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
+# 		STATS=[ STATS; mean(DATA) std(DATA)];
+# 		checkPSW(DATA, capa);
+# 		if(graph)
+# 		  plotPSW(strcat(prefix, "_", int2str(i)), DATA)
+# 		endif
+# 		################## Managerial Due Dates ########################
+# 		info{5}=dd2str("DM", t, r);
+# 		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
+# 		DATA=[ DATA makeDM(DATA, capa,t,r)];
+# 		save_inst(info, N(n), capa, DATA, STATS);
+# 		################## Classical Due Dates ########################
+# 		info{5}=dd2str("DC", t, r);
+# 		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
+# 		DATA=[ DATA makeDC(DATA, capa,t,r)];
+# 		save_inst(info, N(n), capa, DATA, STATS);
+# 		######################################################
+# 	      endfor
+# 	      dd++;  
+# 	    endfor
+# 	  endfor
+# 	endfor
+#       endfor
+#     endfor
+#   endfor
+#   STATS= round(STATS*100)/100;
+#   plotSTATS(STATS);
+# else 
+#   warning "No benchmark generation." 
+# endif
 
 
 
