@@ -217,16 +217,21 @@ global my_colors={ blue_025, green_025, red_025, brown_025, blue_075};
 global my_types={"durations", "sizes", "weights"};
 
 
-function plotDispersion (prefix, idx , M)
+function plotFrequencies(prefix, M)
+  close all
   global my_colors;
   global my_types;
-  h = bar(accumarray(M(:,idx),1)) ;
-  set (h, "facecolor", my_colors{idx}); 
-  set (h, "edgecolor", "black"); 
+  max = [ max(max(M)) 1] ;
+  h = bar( [ accumarray(M(:,1),1, max) accumarray(M(:,2),1, max) accumarray(M(:,3),1, max)]) ;
+  for i=1:3
+    set (h(i), "facecolor", my_colors{i});
+    set (h(i), "edgecolor", my_colors{i});
+  endfor
   xlabel("Value");
   ylabel("#Occurences");
-  title(cstrcat("Distribution of ", my_types{idx}));
-  print(strcat(prefix, "-", my_types{idx}, ".svg"), "-dsvg")
+  title("Frequencies");
+  legend ( my_types{1},  my_types{2},  my_types{3});
+  print(strcat(prefix, "-frequencies.svg"), "-dsvg")
 endfunction
 
 function plotSTAT(idx , M)
@@ -277,13 +282,6 @@ function plotPDF(P, S, W)
 #   pause
 endfunction
 
-
-
-function plotPSW (prefix, M)
- plotDispersion(prefix, 1, M);
- plotDispersion(prefix, 2, M);
- plotDispersion(prefix, 3, M);
-endfunction
 
 function plotSTATS (M)
 plotSTAT(1, M);
@@ -338,62 +336,62 @@ load(args{argidx++});
 PDF_P=computePDF(P);
 PDF_S=computePDF(S);
 PDF_W=computePDF(W);
-plotPDF(PDF_P, PDF_S, PDF_W)
+#plotPDF(PDF_P, PDF_S, PDF_W)
 
-# ############ Loop over number of jobs, durations, sizes and weights ##########
-# nb=str2num(args{argidx++});
-# if(nb > 0)
-# capa=str2num(args{argidx++});
-#   info = cell(1,5);
-#   STATS=[];
-#   for n = 1:length(N)
-#     for p = 1:rows(P)
-#       info{2} = d2str("P", P(p,:)) ;
-#       for s = 1:rows(S)
-# 	info{3} = d2str("S", S(s,:)) ;
-# 	for w = 1:size(W)
-# 	  info{4} = d2str("W", W(w,:));
-# 	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
-# 	  dd=1; 
-# 	  dd2 = length(D)*length(D);
-# 	  if(2*dd2 > 10) 
-# 	    dd_format = "%0.2i";
-# 	  else
-# 	    dd_format = "%i";
-# 	  endif
-# 	  for t = D
-#       	    for r = D
-# 	      for i = 1:nb
-# 		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
-# 		STATS=[ STATS; mean(DATA) std(DATA)];
-# 		checkPSW(DATA, capa);
-# 		if(graph)
-# 		  plotPSW(strcat(prefix, "_", int2str(i)), DATA)
-# 		endif
-# 		################## Managerial Due Dates ########################
-# 		info{5}=dd2str("DM", t, r);
-# 		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
-# 		DATA=[ DATA makeDM(DATA, capa,t,r)];
-# 		save_inst(info, N(n), capa, DATA, STATS);
-# 		################## Classical Due Dates ########################
-# 		info{5}=dd2str("DC", t, r);
-# 		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
-# 		DATA=[ DATA makeDC(DATA, capa,t,r)];
-# 		save_inst(info, N(n), capa, DATA, STATS);
-# 		######################################################
-# 	      endfor
-# 	      dd++;  
-# 	    endfor
-# 	  endfor
-# 	endfor
-#       endfor
-#     endfor
-#   endfor
-#   STATS= round(STATS*100)/100;
-#   plotSTATS(STATS);
-# else 
-#   warning "No benchmark generation." 
-# endif
+############ Loop over number of jobs, durations, sizes and weights ##########
+nb=str2num(args{argidx++});
+if(nb > 0)
+capa=str2num(args{argidx++});
+  info = cell(1,5);
+  STATS=[];
+  for n = 1:length(N)
+    for p = 1:rows(P)
+      info{2} = d2str("P", P(p,:)) ;
+      for s = 1:rows(S)
+	info{3} = d2str("S", S(s,:)) ;
+	for w = 1:size(W)
+	  info{4} = d2str("W", W(w,:));
+	  prefix=strcat("N", int2str(n),"P", int2str(p),"S", int2str(s),"W", int2str(w));
+	  dd=1; 
+	  dd2 = length(D)*length(D);
+	  if(2*dd2 > 10) 
+	    dd_format = "%0.2i";
+	  else
+	    dd_format = "%i";
+	  endif
+	  for t = D
+      	    for r = D
+	      for i = 1:nb
+		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
+		STATS=[ STATS; mean(DATA) std(DATA)];
+		checkPSW(DATA, capa);
+		if(graph)
+		  plotFrequencies(strcat(prefix, "_", int2str(i)), DATA)
+		endif
+		################## Managerial Due Dates ########################
+		info{5}=dd2str("DM", t, r);
+		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
+		DATA=[ DATA makeDM(DATA, capa,t,r)];
+		save_inst(info, N(n), capa, DATA, STATS);
+		################## Classical Due Dates ########################
+		info{5}=dd2str("DC", t, r);
+		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
+		DATA=[ DATA makeDC(DATA, capa,t,r)];
+		save_inst(info, N(n), capa, DATA, STATS);
+		######################################################
+	      endfor
+	      dd++;  
+	    endfor
+	  endfor
+	endfor
+      endfor
+    endfor
+  endfor
+  STATS= round(STATS*100)/100;
+  plotSTATS(STATS);
+else 
+  warning "No benchmark generation." 
+endif
 
 
 
