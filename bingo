@@ -307,6 +307,7 @@ endfunction
 ####################################################
 setenv("GNUTERM", "wxt")
 
+################### Read arguments #######################
 args = argv ();
 argidx=1;
 graph=0;
@@ -327,8 +328,34 @@ else
 endif
 
 
+if(nargin >= argidx)
+  load(args{argidx++});
+else
+  _help();
+  exit(1);
+endif
+
+nb = 1;
+capa=100;
+if(nargin >= argidx)
+  tmp=str2num(args{argidx++});
+  if( ! isnan(tmp))
+    nb = tmp;
+  else
+    warning("unable to read the number of instances: %s (set to default -> %d).", args{argidx-1}, nb);
+  endif
+  if(nargin >= argidx)
+    tmp=str2num(args{argidx++});
+    if( ! isnan(tmp))
+      capa = tmp;
+    else
+          warning("unable to read the batching machine capacity: %s (set to default -> %d).", args{argidx-1}, capa);
+    endif
+  endif
+endif
+
 ################### Compute PDFs #######################
-load(args{argidx++});
+
 
 PDF_P=computePDF(P);
 PDF_S=computePDF(S);
@@ -336,9 +363,7 @@ PDF_W=computePDF(W);
 plotPDF(PDF_P, PDF_S, PDF_W)
 
 ############ Loop over number of jobs, durations, sizes and weights ##########
-nb=str2num(args{argidx++});
 if(nb > 0)
-capa=str2num(args{argidx++});
   info = cell(1,5);
   STATS=[];
   for n = 1:length(N)
