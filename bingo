@@ -242,33 +242,7 @@ function plotSTAT(idx , M)
   print(strcat("summary-", my_types{idx}, ".svg"), "-dsvg")
 endfunction
 
-function plotPDF (idx , M)
-  close all
-  global my_colors;
-  global my_types;
-  R=[ 2:columns(M)];
-  ymax =ceil( max(max(M(:,R)))*10)/10;
-  h=plot(M(:, 1), M(:, R));
-  axis([0,M(rows(M),1), 0, ymax]);
-  title(cstrcat("Probability Density Functions of ",  my_types{idx}));
-  ylabel("Probability Density");
-  xlabel("Value");
-  set (h, "linewidth", 3); 
-  #set (h, "markersize", 10); 
-  cpt = 0;
-  for i = 1:rows(h)
-    for j = 1:columns(h)
-      nbc = length(my_colors);
-      color=my_colors{mod(cpt, nbc)+1};
-      set(h(i,j), "color", color); 
-      cpt++;
-    endfor
-  endfor
-  print(strcat("pdf-", my_types{idx}, ".svg"), "-dsvg")
-#pause
-endfunction
-
-function plotPDF_All (P, S, W)
+function plotPDF(P, S, W)
   close all
   global my_colors;
   title("Probability Density Functions");
@@ -299,8 +273,8 @@ function plotPDF_All (P, S, W)
        cpt++;
      endfor
    endfor
-  # print(strcat("pdf-", my_types{idx}, ".svg"), "-dsvg")
-pause
+   print("summary-pdf.svg", "-dsvg")
+#   pause
 endfunction
 
 
@@ -362,13 +336,9 @@ endif
 load(args{argidx++});
 
 PDF_P=computePDF(P);
-#plotPDF(1, PDF_P)
 PDF_S=computePDF(S);
-#plotPDF(2, PDF_S)
 PDF_W=computePDF(W);
-#plotPDF(3, PDF_W)
-
-plotPDF_All(PDF_P, PDF_S, PDF_W)
+plotPDF(PDF_P, PDF_S, PDF_W)
 
 # ############ Loop over number of jobs, durations, sizes and weights ##########
 # nb=str2num(args{argidx++});
