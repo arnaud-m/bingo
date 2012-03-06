@@ -234,17 +234,20 @@ function plotFrequencies(prefix, M)
   print(strcat(prefix, "-frequencies.svg"), "-dsvg")
 endfunction
 
-function plotSTAT(idx , M)
+function plotStatistics(M)
+  close all;
   global my_colors;
   global my_types;
-  h=errorbar(M(:,idx), M(:, idx + 3));
-  title(strcat("Means and standard deviations (",  my_types{idx},")"));
+  h=errorbar(M(:,[1:3]), M(:, [4:6]));
+  title("Means and standard deviations")
   xlabel("Instance");
   ylabel("Value");
-  axis([0, rows(M), min(M(:,idx) - M(:, idx + 3)) , max(M(:,idx) + M(:, idx + 3))]);
-  set (h, "color",my_colors{idx}); 
-  set (h, "linewidth", 2); 
-  print(strcat("summary-", my_types{idx}, ".svg"), "-dsvg")
+  for i=1:3
+    set (h(i), "color", my_colors{i});
+  endfor
+  set (h, "linewidth", 2);
+  legend ( my_types{1},  my_types{2},  my_types{3});
+  print("summary-statistics.svg", "-dsvg")
 endfunction
 
 function plotPDF(P, S, W)
@@ -282,12 +285,6 @@ function plotPDF(P, S, W)
 #   pause
 endfunction
 
-
-function plotSTATS (M)
-plotSTAT(1, M);
-plotSTAT(2, M);
-plotSTAT(3, M);
-endfunction
 
 #################### Export ########################
 function save_inst(info, n, capa, DATA, STATS)
@@ -336,7 +333,7 @@ load(args{argidx++});
 PDF_P=computePDF(P);
 PDF_S=computePDF(S);
 PDF_W=computePDF(W);
-#plotPDF(PDF_P, PDF_S, PDF_W)
+plotPDF(PDF_P, PDF_S, PDF_W)
 
 ############ Loop over number of jobs, durations, sizes and weights ##########
 nb=str2num(args{argidx++});
@@ -388,7 +385,7 @@ capa=str2num(args{argidx++});
     endfor
   endfor
   STATS= round(STATS*100)/100;
-  plotSTATS(STATS);
+  plotStatistics(STATS);
 else 
   warning "No benchmark generation." 
 endif
