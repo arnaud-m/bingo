@@ -9,8 +9,6 @@ use Pod::Usage;
 ############################################################
 
 my $verbose, my $help, my $man;
-my $nJobs, my $mMachines;
-my $stepMode = 0;
 
 # read command line options
 my $status=GetOptions(
