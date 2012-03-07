@@ -11,12 +11,37 @@
   DOCUMENTATION
  -------------
 
- Look for the most up-to-date documentation on the BINGO web site, under the Documentation menu
- 
+Look for the documentation of the commands using the argument '--help'.
+  
+The instance generator is given by a configuration file (octave format) with the following information:
+        * capacity : scalar - batching machine capacity
+    	* N : 1 x n - vector of sizes
+	* P : p  x 4 - vectors of processing time distribution
+	* S : s  x 4 - vectors of size distribution
+	* W : w  x 4 - vectors of weight distribution
+	  There are three distributions, uniform U[min, max], binomial B(n, p), and mixture (or bimodal) binomial B2(B(n1,p1), B(n2,p2)), encoded as vectors of five elements.
+	       + 0(=Uniform) min max 0 0
+	       + 1(=Binomial) n  p 0 0
+	       + 2(=Mixture Binomial) n1 p1 n2 p2
+	* D : 1 x d - vector of parameters for due date distributions
+2xdxd distributions are generated from the parameters of D ranging between 0 and 1 (recommended).
+The generator defines n*p*s*w*(2xdxd) categories of instance.
+  
+The instance data's file format, using one or four column(s), is as follows:x
+ 	< n := #jobs>
+ 	<capacity := batching machine capacity>
+ 	<J := n x 4 each line is a job, i.e. a vector (duration, size, weight, due-date)>
 
  RELEASE
  -------
 
- The bingo-${project.version}.zip file is composed of the following directories and files:
- TODO
+The bingo-${project.version}.zip file is composed of the following files:
+bingo
+bingo.conf
+bingo-test.conf
+COPYING
+go2opl
+Makefile
+README
+
 
