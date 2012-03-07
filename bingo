@@ -96,23 +96,20 @@ endfunction
 
 
 function P=compute_1_PBatch_Cmax(M, capacity)
-  [S, R] = sort (M (:, 1))
+  [S, R] = sort (M (:, 1));
   n = size(M,1);
   P=zeros(n,1);
   for i=1:n
-    pause
-    M
-    Ri = R(find( R <= i))
+    Ri = R(find( R <= i));
     ##add dummy jobs to ensure that sum s_j is a multiple of the capacity
-    csize = capacity - mod( sum(M([1:i], 2)), capacity)
+    csize = capacity - mod( sum(M([1:i], 2)), capacity);
      for j=1:i
-       csize += M(Ri(j), 2)
+       csize += M(Ri(j), 2);
        if(csize >= capacity)
 	 csize -= capacity;
 	 P(i) += M(Ri(j), 1);
 	endif 
       endfor
-      P(i)
      if(csize > 0)
        error("subproblem resolution \t[FAIL]");
      endif
@@ -120,46 +117,12 @@ function P=compute_1_PBatch_Cmax(M, capacity)
 endfunction
 
 
-function makespan=estimateMakespan(M, idx, capacity)
-if (idx < 1 || idx > size(M,1)) 
-error("Invalid job index");
-endif
-#add dummy jobs to ensure that sum s_j is a multiple of the capacity
-csize = capacity - mod( sum(M([1:idx],2)), capacity);
-#sort the matrix according to the shortest processing time
-[S, I] = sort (M ([1:idx], 1));
-S = M (I, :);
-# start to build batches
-makespan=0;
-for i=1:idx
-  nsize = csize + S(i, 2);
-  if(nsize >= capacity)
-    csize =nsize-capacity;
-    makespan+= S(i,1);
-  else
-    csize=nsize;
-  endif 
-endfor
-if(csize > 0)
-error("Estimation of makespan\t[FAIL]");
-endif
+function R=rangeDClassic(makespan, t, r) 
+  R= [ floor( makespan * (1 - t - 0.5* r)), ceil(makespan * (1 - t  + 0.5* r))];
 endfunction
 
-function D=makeDC(M, capacity, t, r) 
-  nb=size(M,1);
-  Pn = estimateMakespan(M, nb, capacity);
-  D= randi([ floor( Pn * (1 - t - 0.5* r)), ceil(Pn * (1 - t  + 0.5* r))], nb,1);
-endfunction
-
-function D=makeDM(M, capacity, t, r) 
-  compute_1_PBatch_Cmax(M, capacity);
-  exit(1);
-  
-  for j = 1:size(M,1) 
-    Pj =  estimateMakespan(M, j, capacity);
-    D(j) =randi([ floor( Pj * (1 - t*r)), ceil(Pj* (1+ (1-t)*r))]);
-  endfor
-  D=D';
+function R=rangeDManager(makespan, t, r) 
+  R =[ floor( makespan * (1 - t*r)), ceil( makespan * (1+ (1-t)*r))] ;
 endfunction
 
 
@@ -320,9 +283,13 @@ endfunction
 
 
 #################### Export ########################
-function save_inst(info, n, capacity, DATA, STATS)
+function save_instance(info, n, capacity, DATA, STATS)
   global VERSION;
   global verbose;
+  if(size(DATA, 1) != n || size(DATA, 2) != 4)
+    error("invalid generated data");
+    exit(-1);
+  endif
   filename = strcat(info{1}, ".txt");
   fid = fopen (filename, "w");
   fprintf(fid, "#%s created on %s by %s %s (octave %s).\n", info{1}, date, program_name(), VERSION, version);
@@ -421,16 +388,20 @@ if(nb > 0)
 		if(verbose)
 		  plotFrequencies(strcat(prefix, "_", int2str(i)), DATA)
 		endif
+		## Estimate makespan
+		makespans =  compute_1_PBatch_Cmax(DATA, capacity);
 		################## Managerial Due Dates ########################
 		info{5}=dd2str("DM", t, r);
 		info{1} = strcat(prefix, "D", num2str(dd, dd_format), "_", int2str(i));
-		DATA=[ DATA makeDM(DATA, capacity,t,r)];
-		save_inst(info, N(n), capacity, DATA, STATS);
+		tmp = zeros(N(n),1);
+		for idx = 1:N(n)
+		  tmp(idx) = randi( rangeDManager(makespans(idx), t, r));
+		endfor
+		save_instance(info, N(n), capacity,[ DATA tmp], STATS);
 		################## Classical Due Dates ########################
 		info{5}=dd2str("DC", t, r);
 		info{1} =  strcat(prefix, "D", num2str(dd2 + dd, dd_format), "_", int2str(i));
-		DATA=[ DATA makeDC(DATA, capacity,t,r)];
-		save_inst(info, N(n), capacity, DATA, STATS);
+		save_instance(info, N(n), capacity, [ DATA  randi( rangeDClassic(makespans(N(n)), t, r), N(n),1) ], STATS);
 		######################################################
 	      endfor
 	      dd++;  

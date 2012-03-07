@@ -8,7 +8,10 @@ pdf: ;
 	./bingo bingo.conf 0 	
 
 test: clean;
-	./bingo --verbose bingo-test.conf 1
+	./bingo bingo-test.conf 1
+
+fulltest: clean
+	./bingo --verbose bingo-test.conf 1	
 	./go2opl --verbose -- N[0-9]*.txt	
 
 clean:;
