@@ -1,0 +1,120 @@
+#!/usr/bin/perl -W
+use strict qw(vars subs);
+use Getopt::Long;
+use POSIX;
+use Pod::Usage;
+
+############################################################
+#################### read command line options #######################
+############################################################
+
+my $verbose, my $help, my $man;
+my $nJobs, my $mMachines;
+my $stepMode = 0;
+
+# read command line options
+my $status=GetOptions(
+		      #misc options
+		      "verbose!" => \$verbose,
+		      'help' => \$help,
+		      'man' => \$man
+		    #   #generator options
+		    #   "jobs=i"    => sub {
+		    # 	  die("The number of jobs is already defined.\n") if defined $nJobs;
+		    # 	  $nJobs = $_[1];
+		    # 	  die("The number of jobs must be strictly positive.\n") if defined $nJobs <= 0;
+		    # },
+		    #   "machines=i"    => sub {
+		    # 	die("The number of machines is already defined.\n") if defined $mMachines;
+		    # 	$mMachines = $_[1];
+		    # 	  die("The number of machines must be strictly positive.\n") if defined $mMachines <= 0;
+		    # },
+		    #   "step!" => \$stepMode
+		     );
+
+pod2usage(1) if $help;
+pod2usage(-exitstatus => 0, -verbose => 2) if $man;
+$status == 1 or pod2usage(2);
+
+############################################################
+#################### Main script ################################
+############################################################
+
+sub nextLine {
+    my $IN = shift; 
+    my $OUT = shift; 
+    while (<$IN>) {
+	if (s/^\s*#\s*/\/\//) {
+	    print $OUT $_;
+	 }
+	 else
+	 {
+	     chomp;
+	     return $_ ;
+	 }
+    }
+}
+
+foreach my $infile (@ARGV)
+{
+    my $outfile=$infile;
+    $outfile=~ s/(\.[^\.]+)$/-opl$1/;
+    open IN, "<$infile" or die "unable to open $infile: $!";
+    open OUT, ">$outfile" or die "unable to open $outfile: $!";
+    my $nbJobs = &nextLine(\*IN, \*OUT);
+    print OUT "NbJobs=$nbJobs;\n";
+    my $line = &nextLine(\*IN, \*OUT);
+    print OUT "MachineCapacity=$line;\n";
+    print OUT "//<duration, size, weight, due-date>\nJobData = [\n";
+    for (my $i=1; $i<=$nbJobs;$i++) {
+	$line = &nextLine(\*IN, \*OUT);
+	$line =~s/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/<$1, $2, $3, $4>/;
+	print OUT $line;
+	print OUT "," if ($i<$nbJobs);
+	print OUT "\n";
+    }
+    print OUT "];\n";
+    close IN or die "unable to close $infile: $!";
+    close OUT or die "unable to close $outfile: $!";
+    print "Generate $outfile [OK]\n" if $verbose;
+}
+
+
+############################################################
+#################### Pod documentation ############################
+############################################################
+
+__END__
+
+=pod
+
+=head1 NAME
+sample - Using Getopt::Long and Pod::Usage
+
+
+=head1 SYNOPSIS
+sample [options] [file ...]
+
+Options:
+  -help brief help message
+  -man full documentation
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-help>
+
+Print a brief help message and exits.
+
+=item B<-man>
+
+Prints the manual page and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<This program> will read the given input file and do somethinguseful with the contents thereof.
+
+=cut

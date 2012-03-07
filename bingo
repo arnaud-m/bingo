@@ -25,7 +25,8 @@
 #################### Utilities ##########################
 ####################################################
 
- global VERSION="0.1"
+global VERSION="0.1"
+global verbose=0
 
  function _version()
    global VERSION;
@@ -40,6 +41,7 @@ function _help()
   printf("\n\tUsage: %s [OPTION]... CONF N CAPA\n", program_name());
   disp("")
   disp("Options:")
+  disp("\t--verbose      verbose generation mode\n")
   disp("\t--graph      draw graphics for each generated instance\n")
   disp("\t--help        display this help and exit")
   disp("\t--version     output version information and exit");
@@ -187,7 +189,7 @@ function str=d2str(prefix, Dist)
      case 1 
        str=sprintf( "%s = B(%i,%g)" ,prefix, Dist(2:3)); 
      case 2
-       str=sprintf( "%s = {B(%i,%g), B(%i,%g)}" ,prefix, Dist(2:5)); 
+       str=sprintf( "%s = B2(B(%i,%g), B(%i,%g))" ,prefix, Dist(2:5)); 
      otherwise 
       error(cstrcat("Unknown distribution type for random generation : ", int2str(Dist(1))));
   endswitch 
@@ -247,6 +249,7 @@ function plotStatistics(M)
   endfor
   set (h, "linewidth", 2);
   legend ( my_types{1},  my_types{2},  my_types{3});
+  disp("statistical summary of the generated instances plotted in file summary-statistics.svg")
   print("summary-statistics.svg", "-dsvg")
 endfunction
 
@@ -281,6 +284,7 @@ function plotPDF(P, S, W)
        cpt++;
      endfor
    endfor
+   disp("Probability density functions plotted in file summary-pdf.svg")
    print("summary-pdf.svg", "-dsvg")
 #   pause
 endfunction
@@ -289,16 +293,19 @@ endfunction
 #################### Export ########################
 function save_inst(info, n, capa, DATA, STATS)
   global VERSION;
+  global verbose;
   filename = strcat(info{1}, ".txt");
   fid = fopen (filename, "w");
-  fprintf(fid, "# %s created on %s by %s %s (octave %s).\n", info{1}, date, program_name(), VERSION, version);
-  fprintf(fid, "# %s\n# %s\n# %s\n# %s\n",  info{2}, info{3}, info{4}, info{5})
+  fprintf(fid, "#%s created on %s by %s %s (octave %s).\n", info{1}, date, program_name(), VERSION, version);
+  fprintf(fid, "#%s\n# %s\n# %s\n# %s\n",  info{2}, info{3}, info{4}, info{5})
   fprintf(fid, "%i\n%i\n",  n, capa)
   fprintf (fid, "%3i %3i %3i %4i\n", DATA');
   r = rows(STATS);
-  fprintf (fid, "# Averages\n#%3i %3i %3i  %4i\n# Standard deviations\n#%3i %3i %3i %4i", STATS(r,1:3), mean(DATA(:,4)), STATS(r,4:6), std(DATA(:,4)));
+  fprintf (fid, "#Averages\n#%3i %3i %3i  %4i\n#Standard deviations\n#%3i %3i %3i %4i", STATS(r,1:3), mean(DATA(:,4)), STATS(r,4:6), std(DATA(:,4)));
   fclose (fid);
-  printf("Generation of %s\t[OK]\n",info{1});
+  if(verbose)
+    printf("Generation of %s\t[OK]\n",info{1});
+  endif
 endfunction
 
 
@@ -310,7 +317,6 @@ setenv("GNUTERM", "wxt")
 ################### Read arguments #######################
 args = argv ();
 argidx=1;
-graph=0;
 if( nargin > 0)
   if(strcmp(args{1},"--version"))
     _version();
@@ -318,9 +324,9 @@ if( nargin > 0)
   elseif(strcmp(args{1},"--help"))
     _help();
     exit(0);
-  elseif(strcmp(args{1},"--graph"))
+  elseif(strcmp(args{1},"--verbose"))
     argidx=2;
-    graph=1;
+    verbose=1;
   endif
 else
   _help();
@@ -387,7 +393,7 @@ if(nb > 0)
 		DATA=makePSW(N(n), P(p,:), S(s,:), W(w,:));
 		STATS=[ STATS; mean(DATA) std(DATA)];
 		checkPSW(DATA, capa);
-		if(graph)
+		if(verbose)
 		  plotFrequencies(strcat(prefix, "_", int2str(i)), DATA)
 		endif
 		################## Managerial Due Dates ########################
