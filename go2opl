@@ -73,6 +73,16 @@ foreach my $infile (@ARGV)
 	print OUT "\n";
     }
     print OUT "];\n";
+    while (<IN>) {
+	if (s/^\s*#\s*/\/\//) {
+	    print OUT $_;
+	 }
+	 elsif (! /^\s*$/)
+	 {
+	     chomp;
+	     die "Invalid file format: $infile \n>> $_\n";
+	 }
+    }
     close IN or die "unable to close $infile: $!";
     close OUT or die "unable to close $outfile: $!";
     print "Generate $outfile [OK]\n" if $verbose;
